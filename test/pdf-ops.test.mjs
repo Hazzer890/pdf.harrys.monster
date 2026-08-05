@@ -12,6 +12,18 @@ async function makePdf(pageCount, size = [400, 600]) {
   return doc.save();
 }
 
+/** Distinct page widths make "which page went where" observable. */
+async function makePdfWithWidths(widths) {
+  const doc = await PDFDocument.create();
+  for (const w of widths) doc.addPage([w, 500]);
+  return doc.save();
+}
+
+async function widthsOf(bytes) {
+  const doc = await PDFDocument.load(bytes);
+  return doc.getPages().map(p => Math.round(p.getWidth()));
+}
+
 test('splitRanges cuts after the given 0-indexed pages', () => {
   assert.deepEqual(splitRanges(5, [0, 2]), [[0, 1], [1, 3], [3, 5]]);
 });
@@ -24,20 +36,32 @@ test('splitRanges ignores duplicates and out-of-bounds cuts', () => {
   assert.deepEqual(splitRanges(3, [1, 1, 2, 99, -1]), [[0, 2], [2, 3]]);
 });
 
+test('splitRanges honours cut points arriving as strings from a DOM input', () => {
+  assert.deepEqual(splitRanges(5, ['0', '2']), [[0, 1], [1, 3], [3, 5]]);
+  assert.deepEqual(splitRanges(3, ['1', 1]), [[0, 2], [2, 3]]);   // '1' and 1 are one cut
+});
+
 test('splitPdf produces parts of the right sizes and names', async () => {
-  const parts = await splitPdf(await makePdf(5), [0, 2], 'doc');
+  const src = await makePdfWithWidths([100, 200, 300, 400, 500]);
+  const parts = await splitPdf(src, [0, 2], 'doc');
   assert.equal(parts.length, 3);
-  const counts = [];
-  for (const p of parts) counts.push((await PDFDocument.load(p.bytes)).getPageCount());
-  assert.deepEqual(counts, [1, 2, 2]);
+  // Widths, not just counts: a part copying the wrong page window has the
+  // right size but the wrong pages in it.
+  const widths = [];
+  for (const p of parts) widths.push(await widthsOf(p.bytes));
+  assert.deepEqual(widths, [[100], [200, 300], [400, 500]]);
   assert.equal(parts[0].name, 'doc_part_1_pages_1-1.pdf');
   assert.equal(parts[1].name, 'doc_part_2_pages_2-3.pdf');
   assert.equal(parts[2].name, 'doc_part_3_pages_4-5.pdf');
 });
 
-test('mergePdfs totals the input page counts', async () => {
-  const out = await mergePdfs([await makePdf(2), await makePdf(3)]);
+test('mergePdfs concatenates the inputs in order', async () => {
+  const out = await mergePdfs([
+    await makePdfWithWidths([100, 200]),
+    await makePdfWithWidths([300, 400, 500]),
+  ]);
   assert.equal((await PDFDocument.load(out)).getPageCount(), 5);
+  assert.deepEqual(await widthsOf(out), [100, 200, 300, 400, 500]);
 });
 
 test('reorderPdf permutes rather than copying in order', async () => {
@@ -95,6 +119,32 @@ test('rotatePdf rejects an invalid range', async () => {
   await assert.rejects(() => rotatePdf(bytes, { angle: 90, startPage: 1, endPage: 9 }));
 });
 
+test('rotatePdf adds a string angle instead of concatenating it', async () => {
+  const doc = await PDFDocument.create();
+  doc.addPage([400, 600]);
+  doc.getPage(0).setRotation(degrees(90));
+  // Uncoerced, 90 + '90' is '9090', and '9090' % 360 is 90 — silently wrong.
+  const out = await rotatePdf(await doc.save(), { angle: '90', startPage: '1', endPage: '1' });
+  assert.equal((await PDFDocument.load(out)).getPage(0).getRotation().angle, 180);
+});
+
+test('rotatePdf rejects an angle that is not a whole multiple of 90', async () => {
+  const bytes = await makePdf(3);
+  for (const angle of [45, 90.5, 'abc', undefined]) {
+    await assert.rejects(() => rotatePdf(bytes, { angle, startPage: 1, endPage: 1 }),
+      /multiples of 90/, `angle ${String(angle)} should be rejected`);
+  }
+});
+
+test('rotatePdf rejects a fractional page number with the range message', async () => {
+  const bytes = await makePdf(3);
+  // 1.5 slips past a bare `>= 1` guard and dies inside pdf-lib on getPage(0.5).
+  await assert.rejects(() => rotatePdf(bytes, { angle: 90, startPage: 1.5, endPage: 2 }),
+    /Page range must be between 1 and 3/);
+  await assert.rejects(() => rotatePdf(bytes, { angle: 90, startPage: 1, endPage: 2.5 }),
+    /Page range must be between 1 and 3/);
+});
+
 test('resizeToA4 produces A4 pages from any input size', async () => {
   const doc = await PDFDocument.create();
   // Pages need a content stream to be embeddable, so draw something.
@@ -105,6 +155,10 @@ test('resizeToA4 produces A4 pages from any input size', async () => {
   for (const page of (await PDFDocument.load(out)).getPages()) {
     assert.equal(Math.round(page.getWidth()), Math.round(A4[0]));
     assert.equal(Math.round(page.getHeight()), Math.round(A4[1]));
+    // Right page size but no content is exactly how a resize tool fails.
+    const contents = page.node.Contents();
+    assert.ok(contents && contents.size() > 0,
+      'resized page has no /Contents — the source page was never embedded');
   }
 });
 
@@ -116,6 +170,10 @@ test('resizeToA4 keeps a contentless page as a blank A4 page', async () => {
   const pages = (await PDFDocument.load(out)).getPages();
   assert.equal(pages.length, 2);
   assert.equal(Math.round(pages[0].getWidth()), Math.round(A4[0]));
+  // The blank page stays blank, and the drawn one is still distinguishable
+  // from it — otherwise "keeps it blank" would also pass for "drops everything".
+  assert.ok(!pages[0].node.Contents(), 'the contentless page gained content');
+  assert.ok(pages[1].node.Contents()?.size() > 0, 'the drawn page lost its content');
 });
 
 test('signaturePlacement passes an unrotated page straight through', () => {

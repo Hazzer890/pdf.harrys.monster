@@ -16,7 +16,9 @@ export async function loadPdf(bytes) {
 
 /** Cut points are 0-indexed pages to cut *after*. Returns half-open ranges. */
 export function splitRanges(pageCount, cutPoints) {
-  const cuts = [...new Set(cutPoints)]
+  // DOM inputs hand back strings; coerce before the integer filter so '2'
+  // is honoured rather than silently dropped.
+  const cuts = [...new Set([...cutPoints].map(Number))]
     .filter(c => Number.isInteger(c) && c >= 0 && c < pageCount - 1)
     .sort((a, b) => a - b);
   const ranges = [];
@@ -60,16 +62,27 @@ export async function splitPdf(buf, cutPoints, baseName = 'document') {
 }
 
 export async function rotatePdf(buf, { angle, startPage, endPage }) {
+  // DOM inputs hand back strings. Untreated, `angle` concatenates instead of
+  // adding ('90' onto a 90 page gives 90, not 180) and a fractional page index
+  // slips past the guard into a raw pdf-lib crash.
+  const deg = Number(angle);
+  const from = Number(startPage);
+  const to = Number(endPage);
+  if (!Number.isInteger(deg) || deg % 90 !== 0) {
+    throw new Error('Rotation must be a whole number of degrees, in multiples of 90.');
+  }
   const doc = await loadPdf(buf);
   const count = doc.getPageCount();
-  if (!(startPage >= 1 && endPage <= count && startPage <= endPage)) {
+  const validRange = Number.isInteger(from) && Number.isInteger(to)
+    && from >= 1 && to <= count && from <= to;
+  if (!validRange) {
     throw new Error(`Page range must be between 1 and ${count}, with the start before the end.`);
   }
-  for (let i = startPage - 1; i <= endPage - 1; i++) {
+  for (let i = from - 1; i <= to - 1; i++) {
     const page = doc.getPage(i);
     // Normalise to [0, 360): JS % keeps the left operand's sign, and a
     // malformed PDF can carry a negative /Rotate. Matches signaturePlacement.
-    const sum = page.getRotation().angle + angle;
+    const sum = page.getRotation().angle + deg;
     page.setRotation(degrees(((sum % 360) + 360) % 360));
   }
   return doc.save();
