@@ -71,6 +71,24 @@ test('rotatePdf wraps past 360', async () => {
   assert.equal((await PDFDocument.load(out)).getPage(0).getRotation().angle, 90);
 });
 
+test('rotatePdf normalises a negative existing rotation to zero', async () => {
+  const doc = await PDFDocument.create();
+  doc.addPage([400, 600]);
+  doc.getPage(0).setRotation(degrees(-90));
+  const out = await rotatePdf(await doc.save(), { angle: 90, startPage: 1, endPage: 1 });
+  assert.equal((await PDFDocument.load(out)).getPage(0).getRotation().angle, 0);
+});
+
+test('rotatePdf never emits a negative rotation', async () => {
+  const doc = await PDFDocument.create();
+  doc.addPage([400, 600]);
+  doc.getPage(0).setRotation(degrees(-270));
+  const out = await rotatePdf(await doc.save(), { angle: 90, startPage: 1, endPage: 1 });
+  const { angle } = (await PDFDocument.load(out)).getPage(0).getRotation();
+  assert.equal(angle, 180);            // -270 + 90 = -180 -> 180
+  assert.ok(angle >= 0 && angle < 360, `rotation ${angle} outside [0, 360)`);
+});
+
 test('rotatePdf rejects an invalid range', async () => {
   const bytes = await makePdf(3);
   await assert.rejects(() => rotatePdf(bytes, { angle: 90, startPage: 3, endPage: 1 }));

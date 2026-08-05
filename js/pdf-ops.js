@@ -67,7 +67,10 @@ export async function rotatePdf(buf, { angle, startPage, endPage }) {
   }
   for (let i = startPage - 1; i <= endPage - 1; i++) {
     const page = doc.getPage(i);
-    page.setRotation(degrees((page.getRotation().angle + angle) % 360));
+    // Normalise to [0, 360): JS % keeps the left operand's sign, and a
+    // malformed PDF can carry a negative /Rotate. Matches signaturePlacement.
+    const sum = page.getRotation().angle + angle;
+    page.setRotation(degrees(((sum % 360) + 360) % 360));
   }
   return doc.save();
 }
