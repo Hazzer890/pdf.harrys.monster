@@ -69,7 +69,8 @@ export function init() {
         status.textContent = `Loaded: ${file.name} · ${doc.numPages} pages`;
       } catch (err) {
         if (file !== next) return;
-        status.textContent = 'No PDF loaded.'; // never leave "Reading…" hanging
+        // The status says which file, the error below says why.
+        status.textContent = `Could not read ${file.name}.`;
         showError(ID, err.message);
       } finally {
         // We loaded this document, so we own it. This pdf.js build has no
