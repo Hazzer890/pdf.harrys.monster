@@ -20,8 +20,16 @@ function select(id) {
 }
 
 function selectFromHash() {
-  const id = location.hash.slice(1);
-  select(tools.has(id) || document.getElementById(`panel-${id}`) ? id : 'merge');
+  let id = location.hash.slice(1);
+  if (!document.getElementById(`panel-${id}`)) {
+    id = 'merge';
+    // replace, not push: otherwise Back returns to the bad hash and bounces forward again.
+    location.replace(`#${id}`);
+  }
+  // Our own select() assigns the hash, which fires hashchange. Bail so onFiles runs once.
+  const btn = document.querySelector(`.tool-btn[data-tool="${id}"]`);
+  if (btn && btn.getAttribute('aria-current') === 'true') return;
+  select(id);
 }
 
 function init() {

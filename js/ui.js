@@ -6,7 +6,8 @@ export const state = {
   onChange(fn) { this._subs.push(fn); },
   set(files) {
     this.files = files;
-    this._subs.forEach(fn => fn(this.files));
+    // one bad subscriber must not stop the rest, or escape into the DOM handler
+    this._subs.forEach(fn => { try { fn(this.files); } catch (err) { console.error(err); } });
   },
   pdfs() { return this.files.filter(f => /\.pdf$/i.test(f.name)); },
   images() { return this.files.filter(f => /\.(png|jpe?g|bmp|tiff?|webp)$/i.test(f.name)); },
@@ -28,7 +29,8 @@ export function initDropzone() {
   const list = document.getElementById('file-list');
 
   document.getElementById('browse').addEventListener('click', () => input.click());
-  input.addEventListener('change', () => add([...input.files]));
+  // reset value, or re-picking the same file after Remove fires no change event
+  input.addEventListener('change', () => { add([...input.files]); input.value = ''; });
 
   ['dragenter', 'dragover'].forEach(ev => zone.addEventListener(ev, e => {
     e.preventDefault(); zone.classList.add('is-over');
@@ -96,9 +98,15 @@ export function clearError(panelId) {
 }
 
 export async function busy(panelEl, promise) {
+  // depth counter: overlapping calls must not re-enable the panel early
+  panelEl.dataset.busy = String(Number(panelEl.dataset.busy || 0) + 1);
   panelEl.classList.add('busy');
   try { return await promise; }
-  finally { panelEl.classList.remove('busy'); }
+  finally {
+    const left = Number(panelEl.dataset.busy) - 1;
+    if (left > 0) panelEl.dataset.busy = String(left);
+    else { delete panelEl.dataset.busy; panelEl.classList.remove('busy'); }
+  }
 }
 
 let pdfjsPromise = null;
@@ -141,9 +149,20 @@ const CONCURRENCY = 4;
 
 /** Live grid per container, so a re-render can tear the previous one down. */
 const grids = new WeakMap();
+/** Call counter per container: parsing is async, so calls can finish out of order. */
+const gens = new WeakMap();
 
 export async function renderGrid(container, file, { onThumb } = {}) {
+  const gen = (gens.get(container) || 0) + 1;
+  gens.set(container, gen);
+
   const pdf = await loadPdfjsDoc(file);
+
+  // A newer call started while this one was parsing: it owns the container now.
+  if (gens.get(container) !== gen) {
+    pdf.loadingTask.destroy().catch(() => {});
+    return { pdf: null, count: 0, stale: true };
+  }
 
   const prev = grids.get(container);
   if (prev) {
@@ -175,9 +194,17 @@ export async function renderGrid(container, file, { onThumb } = {}) {
       observer.unobserve(entry.target);
       const el = entry.target;
       queue.push(async () => {
-        const { canvas } = await renderPageToCanvas(pdf, Number(el.dataset.page), 0.4);
-        const ph = el.querySelector('.thumb-ph');
-        if (ph) ph.replaceWith(canvas);
+        try {
+          const { canvas } = await renderPageToCanvas(pdf, Number(el.dataset.page), 0.4);
+          const ph = el.querySelector('.thumb-ph');
+          if (ph) ph.replaceWith(canvas);
+        } catch (err) {
+          // torn down by a newer render: expected, say nothing. Otherwise the page really failed.
+          if (gens.get(container) !== gen) return;
+          el.classList.add('thumb-failed');
+          const label = el.querySelector('.thumb-label');
+          if (label) label.textContent = `Page ${el.dataset.page} · preview failed`;
+        }
       });
       pump();
     }
