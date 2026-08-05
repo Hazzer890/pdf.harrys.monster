@@ -139,8 +139,20 @@ export async function renderPageToCanvas(pdf, pageNumber, scale) {
 /** Renders at most CONCURRENCY pages at a time, and only once visible. */
 const CONCURRENCY = 4;
 
+/** Live grid per container, so a re-render can tear the previous one down. */
+const grids = new WeakMap();
+
 export async function renderGrid(container, file, { onThumb } = {}) {
   const pdf = await loadPdfjsDoc(file);
+
+  const prev = grids.get(container);
+  if (prev) {
+    prev.observer.disconnect();
+    // this pdf.js build has no PDFDocumentProxy.destroy(); teardown is on the loading task.
+    prev.pdf.loadingTask.destroy().catch(() => {});
+    grids.delete(container);
+  }
+
   container.innerHTML = '';
   // add, not assign: the container is usually .panel-body and tools re-query it.
   container.classList.add('thumb-grid');
@@ -152,7 +164,8 @@ export async function renderGrid(container, file, { onThumb } = {}) {
     while (running < CONCURRENCY && queue.length) {
       const job = queue.shift();
       running++;
-      job().finally(() => { running--; pump(); });
+      // destroy() rejects in-flight renders; swallow so nothing goes unhandled.
+      job().catch(() => {}).finally(() => { running--; pump(); });
     }
   };
 
@@ -181,5 +194,6 @@ export async function renderGrid(container, file, { onThumb } = {}) {
     observer.observe(card);
   }
 
+  grids.set(container, { observer, pdf });
   return { pdf, count: pdf.numPages };
 }
