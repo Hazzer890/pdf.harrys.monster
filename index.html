@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Free browser-based PDF toolkit: merge, split, compress, rotate, reorder, sign and convert PDFs. Everything runs client-side, no file ever leaves your device.">
+  <meta name="theme-color" content="#f5f7fc">
+  <link rel="canonical" href="https://pdf.harrys.monster/">
+  <title>PDF tools | Harry Cassidy</title>
+
+  <!-- Favicon: h.m monogram -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%232563eb'/><text x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-family='JetBrains Mono,ui-monospace,monospace' font-size='30' font-weight='700' fill='%23fafafa'>h<tspan fill='%23dbeafe'>.</tspan>m</text></svg>">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/reset.css">
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+  <!-- SVG filter defs (shared background mount) -->
+  <svg class="glass-defs" aria-hidden="true" focusable="false" width="0" height="0">
+    <defs>
+      <filter id="glass-distortion" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.008 0.012" numOctaves="2" seed="7" result="noise"/>
+        <feGaussianBlur in="noise" stdDeviation="3" result="softNoise"/>
+
+        <!-- Chromatic aberration: each channel bends by a different amount,
+             then the three are recombined. -->
+        <feDisplacementMap in="SourceGraphic" in2="softNoise" scale="18" xChannelSelector="R" yChannelSelector="G" result="bendR"/>
+        <feDisplacementMap in="SourceGraphic" in2="softNoise" scale="13" xChannelSelector="R" yChannelSelector="G" result="bendG"/>
+        <feDisplacementMap in="SourceGraphic" in2="softNoise" scale="8"  xChannelSelector="R" yChannelSelector="G" result="bendB"/>
+        <feColorMatrix in="bendR" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="onlyR"/>
+        <feColorMatrix in="bendG" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="onlyG"/>
+        <feColorMatrix in="bendB" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="onlyB"/>
+        <feBlend in="onlyR" in2="onlyG" mode="screen" result="bentRG"/>
+        <feBlend in="bentRG" in2="onlyB" mode="screen" result="bent"/>
+
+        <!-- Edge refraction: a band along the rim bends much harder, the way
+             a thick lens does where it curves away. -->
+        <feMorphology in="SourceAlpha" operator="erode" radius="18" result="core"/>
+        <feComposite in="SourceAlpha" in2="core" operator="out" result="rim"/>
+        <feGaussianBlur in="rim" stdDeviation="7" result="rimSoft"/>
+        <feDisplacementMap in="SourceGraphic" in2="softNoise" scale="38" xChannelSelector="R" yChannelSelector="G" result="bendEdge"/>
+        <feComposite in="bendEdge" in2="rimSoft" operator="in" result="edgeOnly"/>
+        <feMerge>
+          <feMergeNode in="bent"/>
+          <feMergeNode in="edgeOnly"/>
+        </feMerge>
+      </filter>
+    </defs>
+  </svg>
+
+  <!-- Background mount: flow-field canvas + drifting gradient blobs -->
+  <canvas id="field" aria-hidden="true"></canvas>
+  <div class="backdrop" aria-hidden="true">
+    <span class="blob blob--indigo"></span>
+    <span class="blob blob--cyan"></span>
+    <span class="blob blob--magenta"></span>
+    <span class="grain"></span>
+  </div>
+
+  <header class="header">
+    <nav class="nav" aria-label="Primary">
+      <a href="https://harrys.monster" class="nav-logo">Harry Cassidy</a>
+      <span class="nav-title">PDF tools</span>
+    </nav>
+  </header>
+
+  <main class="app container">
+    <div class="dropzone glass" id="dropzone">
+      <input type="file" id="file-input" multiple accept="application/pdf,image/*" hidden>
+      <p>Drop files here, or <button type="button" class="btn btn-ghost" id="browse">browse</button></p>
+      <ul class="file-list" id="file-list" aria-live="polite"></ul>
+    </div>
+
+    <div class="app-body">
+      <nav class="tool-nav" aria-label="Tools">
+        <button class="tool-btn" data-tool="merge">Merge PDFs</button>
+        <button class="tool-btn" data-tool="images">Photo to PDF</button>
+        <button class="tool-btn" data-tool="split">Split PDF</button>
+        <button class="tool-btn" data-tool="compress">Compress PDF</button>
+        <button class="tool-btn" data-tool="convert">PDF to PNG/JPG</button>
+        <button class="tool-btn" data-tool="sign">Sign PDF</button>
+        <button class="tool-btn" data-tool="rotate">Rotate PDF</button>
+        <button class="tool-btn" data-tool="reorder">Change page order</button>
+        <button class="tool-btn" data-tool="a4">Resize to A4</button>
+      </nav>
+
+      <div class="tool-panels" id="panels">
+        <!-- One per tool, filled by later tasks -->
+        <section class="panel glass" id="panel-merge" hidden>
+          <h2>Merge PDFs</h2>
+          <p class="panel-sub">Add multiple PDFs, reorder them, and export a single combined file.</p>
+          <div class="panel-body"></div>
+          <p class="panel-error" role="alert" hidden></p>
+        </section>
+        <section class="panel glass" id="panel-images" hidden>
+          <h2>Photo to PDF</h2>
+          <p class="panel-sub">Convert one or more images into a PDF document.</p>
+          <div class="panel-body"></div>
+          <p class="panel-error" role="alert" hidden></p>
+        </section>
+        <section class="panel glass" id="panel-split" hidden>
+          <h2>Split PDF</h2>
+          <p class="panel-sub">Page thumbnails with cut points placed between pages.</p>
+          <div class="panel-body"></div>
+          <p class="panel-error" role="alert" hidden></p>
+        </section>
+        <section class="panel glass" id="panel-compress" hidden>
+          <h2>Compress PDF</h2>
+          <p class="panel-sub">Rebuild the PDF at a lower image quality to reduce file size.</p>
+          <div class="panel-body"></div>
+          <p class="panel-error" role="alert" hidden></p>
+        </section>
+        <section class="panel glass" id="panel-convert" hidden>
+          <h2>PDF to PNG/JPG</h2>
+          <p class="panel-sub">Render each page and export to PNG or JPG images.</p>
+          <div class="panel-body"></div>
+          <p class="panel-error" role="alert" hidden></p>
+        </section>
+        <section class="panel glass" id="panel-sign" hidden>
+          <h2>Sign PDF</h2>
+          <p class="panel-sub">Draw or upload a signature, then place it on the page. This is a visual stamp, not a cryptographic signature.</p>
+          <div class="panel-body"></div>
+          <p class="panel-error" role="alert" hidden></p>
+        </section>
+        <section class="panel glass" id="panel-rotate" hidden>
+          <h2>Rotate PDF</h2>
+          <p class="panel-sub">Rotate all pages or a selected page range by 90, 180, or 270 degrees.</p>
+          <div class="panel-body"></div>
+          <p class="panel-error" role="alert" hidden></p>
+        </section>
+        <section class="panel glass" id="panel-reorder" hidden>
+          <h2>Change page order</h2>
+          <p class="panel-sub">Preview pages, move them, and save a reordered PDF.</p>
+          <div class="panel-body"></div>
+          <p class="panel-error" role="alert" hidden></p>
+        </section>
+        <section class="panel glass" id="panel-a4" hidden>
+          <h2>Resize to A4</h2>
+          <p class="panel-sub">Convert every page to A4 (595 × 842 pt), scaled to fit while keeping aspect ratio.</p>
+          <div class="panel-body"></div>
+          <p class="panel-error" role="alert" hidden></p>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>Everything runs in your browser. No file leaves your device.</p>
+      <p>Harry Cassidy &copy; <span id="year">2026</span> ·
+         <a href="https://harrys.monster">harrys.monster</a></p>
+    </div>
+  </footer>
+
+  <script src="js/background.js" defer></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
