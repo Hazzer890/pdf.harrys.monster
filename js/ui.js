@@ -100,3 +100,86 @@ export async function busy(panelEl, promise) {
   try { return await promise; }
   finally { panelEl.classList.remove('busy'); }
 }
+
+let pdfjsPromise = null;
+
+export function getPdfjs() {
+  if (!pdfjsPromise) {
+    pdfjsPromise = import('../vendor/pdf.min.mjs').then(lib => {
+      lib.GlobalWorkerOptions.workerSrc = new URL('../vendor/pdf.worker.min.mjs', import.meta.url).href;
+      return lib;
+    });
+  }
+  return pdfjsPromise;
+}
+
+export async function loadPdfjsDoc(file) {
+  const lib = await getPdfjs();
+  const data = new Uint8Array(await file.arrayBuffer());
+  try {
+    return await lib.getDocument({ data }).promise;
+  } catch (err) {
+    if (err && err.name === 'PasswordException') {
+      throw new Error('This PDF is password-protected. Remove the password and try again.');
+    }
+    throw new Error('Could not read this PDF. The file may be corrupt.');
+  }
+}
+
+export async function renderPageToCanvas(pdf, pageNumber, scale) {
+  const page = await pdf.getPage(pageNumber);
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.ceil(viewport.width);
+  canvas.height = Math.ceil(viewport.height);
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+  return { canvas, viewport, page };
+}
+
+/** Renders at most CONCURRENCY pages at a time, and only once visible. */
+const CONCURRENCY = 4;
+
+export async function renderGrid(container, file, { onThumb } = {}) {
+  const pdf = await loadPdfjsDoc(file);
+  container.innerHTML = '';
+  // add, not assign: the container is usually .panel-body and tools re-query it.
+  container.classList.add('thumb-grid');
+
+  const queue = [];
+  let running = 0;
+
+  const pump = () => {
+    while (running < CONCURRENCY && queue.length) {
+      const job = queue.shift();
+      running++;
+      job().finally(() => { running--; pump(); });
+    }
+  };
+
+  const observer = new IntersectionObserver(entries => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      observer.unobserve(entry.target);
+      const el = entry.target;
+      queue.push(async () => {
+        const { canvas } = await renderPageToCanvas(pdf, Number(el.dataset.page), 0.4);
+        const ph = el.querySelector('.thumb-ph');
+        if (ph) ph.replaceWith(canvas);
+      });
+      pump();
+    }
+  }, { root: null, rootMargin: '200px' });
+
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const card = document.createElement('div');
+    card.className = 'thumb';
+    card.dataset.page = String(i);
+    card.dataset.index = String(i - 1);
+    card.innerHTML = `<div class="thumb-ph"></div><div class="thumb-label">Page ${i}</div>`;
+    if (onThumb) onThumb(card, i - 1);
+    container.append(card);
+    observer.observe(card);
+  }
+
+  return { pdf, count: pdf.numPages };
+}
