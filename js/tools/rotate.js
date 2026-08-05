@@ -26,12 +26,16 @@ export function init() {
     clearError(ID);
     if (!file) return showError(ID, 'Add a PDF first.');
     try {
-      const { rotatePdf } = await import('../pdf-ops.js');
-      const bytes = await busy(panel, rotatePdf(new Uint8Array(await file.arrayBuffer()), {
-        angle: body.querySelector('#rot-angle').value,
-        startPage: startEl.value,
-        endPage: endEl.value,
-      }));
+      // Everything inside busy(), including the import and the file read: any
+      // work left outside it leaves the button live for a second click.
+      const bytes = await busy(panel, (async () => {
+        const { rotatePdf } = await import('../pdf-ops.js');
+        return rotatePdf(new Uint8Array(await file.arrayBuffer()), {
+          angle: body.querySelector('#rot-angle').value,
+          startPage: startEl.value,
+          endPage: endEl.value,
+        });
+      })());
       downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `${baseName(file)}_rotated.pdf`);
     } catch (err) {
       // rotatePdf throws a different message for a bad angle than for a bad
@@ -48,17 +52,25 @@ export function init() {
       if (next === file) return;
       file = next;
       clearError(ID);
-      if (!file) { status.textContent = 'No PDF loaded.'; return; }
+      // Reset before the parse, not after it. A failed load that only shows an
+      // error would otherwise leave the previous document's page count and
+      // range on screen, and the early return above means nothing corrects it.
+      startEl.max = endEl.max = '';
+      startEl.value = endEl.value = '1';
+      status.textContent = file ? `Reading ${file.name}…` : 'No PDF loaded.';
+      if (!file) return;
       let doc;
       try {
-        doc = await loadPdfjsDoc(file);
+        doc = await busy(panel, loadPdfjsDoc(file));
         if (file !== next) return; // a newer file took over while this one parsed
         startEl.max = endEl.max = doc.numPages;
         startEl.value = 1;
         endEl.value = doc.numPages;
         status.textContent = `Loaded: ${file.name} · ${doc.numPages} pages`;
       } catch (err) {
-        if (file === next) showError(ID, err.message);
+        if (file !== next) return;
+        status.textContent = 'No PDF loaded.'; // never leave "Reading…" hanging
+        showError(ID, err.message);
       } finally {
         // We loaded this document, so we own it. This pdf.js build has no
         // PDFDocumentProxy.destroy(); teardown is on the loading task.

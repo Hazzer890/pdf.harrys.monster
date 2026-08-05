@@ -1,5 +1,5 @@
 import { registerTool } from '../app.js';
-import { state, downloadBlob, showError, clearError, busy } from '../ui.js';
+import { state, downloadBlob, showError, clearError, busy, baseName } from '../ui.js';
 
 const ID = 'merge';
 
@@ -49,11 +49,17 @@ export function init() {
     clearError(ID);
     if (order.length < 2) return showError(ID, 'Add at least two PDFs first.');
     try {
-      const { mergePdfs } = await import('../pdf-ops.js');
-      const buffers = [];
-      for (const f of order) buffers.push(new Uint8Array(await f.arrayBuffer()));
-      const bytes = await busy(panel, mergePdfs(buffers));
-      downloadBlob(new Blob([bytes], { type: 'application/pdf' }), 'merged.pdf');
+      // Everything inside busy(), including the import and the file reads: any
+      // work left outside it leaves the button live for a second click, and the
+      // arrows live for a reorder while this loop is still reading `order`.
+      const name = `${baseName(order[0])}_merged.pdf`;
+      const bytes = await busy(panel, (async () => {
+        const { mergePdfs } = await import('../pdf-ops.js');
+        const buffers = [];
+        for (const f of order) buffers.push(new Uint8Array(await f.arrayBuffer()));
+        return mergePdfs(buffers);
+      })());
+      downloadBlob(new Blob([bytes], { type: 'application/pdf' }), name);
     } catch (err) {
       showError(ID, err.message);
     }
