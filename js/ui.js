@@ -130,8 +130,10 @@ export function loadInto(id, { status, reset, load, apply }) {
       if (stale) return; // a newer render owns the container — show nothing, this is not an error
       // Distinct from `stale`: removing the file returns above without ever
       // starting a newer render, so the generation is never bumped and nothing
-      // else would clear this finished load away.
-      if (current !== next) { reset(); return; }
+      // else would clear this finished load away. Only reset when the file is
+      // gone — if another file took over it has already reset and applied its
+      // own widgets, and clearing them here would wipe *its* state.
+      if (current !== next) { if (!current) reset(); return; }
       apply(count);
       status.textContent = `Loaded: ${next.name} · ${count} pages`;
     } catch (err) {
