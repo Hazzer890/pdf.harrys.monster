@@ -16,9 +16,11 @@ export async function loadPdf(bytes) {
 
 /** Cut points are 0-indexed pages to cut *after*. Returns half-open ranges. */
 export function splitRanges(pageCount, cutPoints) {
-  // DOM inputs hand back strings; coerce before the integer filter so '2'
-  // is honoured rather than silently dropped.
-  const cuts = [...new Set([...cutPoints].map(Number))]
+  // DOM inputs hand back strings, so '2' must be coerced to be honoured. But a
+  // cleared input is '' and Number('') is 0 — a legal cut point — so blanks are
+  // left as-is for the integer filter below to drop, along with every non-string.
+  const toCut = c => (typeof c === 'string' && c.trim() !== '' ? Number(c) : c);
+  const cuts = [...new Set([...cutPoints].map(toCut))]
     .filter(c => Number.isInteger(c) && c >= 0 && c < pageCount - 1)
     .sort((a, b) => a - b);
   const ranges = [];

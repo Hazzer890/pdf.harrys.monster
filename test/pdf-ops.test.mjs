@@ -41,6 +41,14 @@ test('splitRanges honours cut points arriving as strings from a DOM input', () =
   assert.deepEqual(splitRanges(3, ['1', 1]), [[0, 2], [2, 3]]);   // '1' and 1 are one cut
 });
 
+test('splitRanges ignores a blank cut point rather than reading it as 0', () => {
+  // Number('') is 0, which is a legal cut point — a cleared DOM input must not
+  // silently insert a cut after page 1.
+  assert.deepEqual(splitRanges(5, ['', 2]), splitRanges(5, [2]));
+  assert.deepEqual(splitRanges(5, ['', 2]), [[0, 3], [3, 5]]);
+  assert.deepEqual(splitRanges(5, ['  ', null, undefined, NaN, 'abc']), [[0, 5]]);
+});
+
 test('splitPdf produces parts of the right sizes and names', async () => {
   const src = await makePdfWithWidths([100, 200, 300, 400, 500]);
   const parts = await splitPdf(src, [0, 2], 'doc');
