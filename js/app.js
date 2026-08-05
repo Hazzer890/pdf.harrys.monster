@@ -1,4 +1,6 @@
 import { initDropzone, state } from './ui.js';
+import { init as initMerge } from './tools/merge.js';
+import { init as initRotate } from './tools/rotate.js';
 
 const tools = new Map();
 
@@ -35,6 +37,9 @@ function selectFromHash() {
 function init() {
   document.getElementById('year').textContent = new Date().getFullYear();
   initDropzone();
+
+  initMerge();
+  initRotate();
 
   document.querySelectorAll('.tool-btn').forEach(btn => {
     btn.addEventListener('click', () => select(btn.dataset.tool));
