@@ -1,5 +1,5 @@
 import { registerTool } from '../app.js';
-import { state, renderGrid, downloadBlob, showError, clearError, busy, baseName } from '../ui.js';
+import { state, renderGrid, loadInto, downloadBlob, showError, clearError, busy, baseName } from '../ui.js';
 
 const ID = 'reorder';
 
@@ -15,15 +15,23 @@ export function init() {
 
   const grid = body.querySelector('#reorder-grid');
   const status = body.querySelector('#reorder-status');
-  let file = null;
+  const file = () => state.pdfs()[0] || null;
   let order = [];
   let dragFrom = null;
 
   function move(from, to) {
-    if (from < 0 || to < 0 || to >= order.length) return;
+    if (from < 0 || from >= order.length || to < 0 || to >= order.length) return;
     const [item] = order.splice(from, 1);
     order.splice(to, 0, item);
+    const pressed = document.activeElement;
     paint();
+    // paint() may have just disabled the arrow that was pressed, and the browser
+    // drops focus to the document when that happens. Hand it to the sibling so a
+    // keyboard user can keep going.
+    if (pressed && pressed.disabled && pressed.parentElement) {
+      const sibling = [...pressed.parentElement.children].find(b => !b.disabled);
+      if (sibling) sibling.focus();
+    }
   }
 
   function paint() {
@@ -34,6 +42,9 @@ export function init() {
       // a button, and a keyboard user keeps focus on the arrow they just pressed.
       card.style.order = String(pos);
       card.querySelector('.thumb-label').textContent = `Position ${pos + 1} · page ${pageIdx + 1}`;
+      const [earlier, later] = card.querySelector('.thumb-actions').children;
+      earlier.disabled = pos === 0;
+      later.disabled = pos === order.length - 1;
     });
   }
 
@@ -43,7 +54,13 @@ export function init() {
       dragFrom = order.indexOf(index);
       card.classList.add('is-dragging');
     });
-    card.addEventListener('dragend', () => card.classList.remove('is-dragging'));
+    card.addEventListener('dragend', () => {
+      card.classList.remove('is-dragging');
+      // Clear the position too. A drag cancelled with Esc or released outside the
+      // grid still ends here, and a leftover dragFrom would be applied by the next
+      // drop to land on a card — including a file dragged in from the desktop.
+      dragFrom = null;
+    });
     card.addEventListener('dragover', e => e.preventDefault());
     card.addEventListener('drop', e => {
       e.preventDefault();
@@ -71,47 +88,33 @@ export function init() {
 
   body.querySelector('#reorder-go').addEventListener('click', async () => {
     clearError(ID);
-    if (!file) return showError(ID, 'Add a PDF first.');
+    const pdf = file();
+    if (!pdf) return showError(ID, 'Add a PDF first.');
     try {
       // Everything inside busy(), including the import and the file read: any
       // work left outside it leaves the button live for a second click.
       const bytes = await busy(panel, (async () => {
         const { reorderPdf } = await import('../pdf-ops.js');
-        return reorderPdf(new Uint8Array(await file.arrayBuffer()), order);
+        return reorderPdf(new Uint8Array(await pdf.arrayBuffer()), order);
       })());
-      downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `${baseName(file)}_reordered.pdf`);
+      downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `${baseName(pdf)}_reordered.pdf`);
     } catch (err) {
       showError(ID, err.message);
     }
   });
 
   registerTool(ID, {
-    async onFiles() {
-      const next = state.pdfs()[0] || null;
-      // onFiles also fires on every panel switch; rebuilding the grid would
-      // throw away the order the user just arranged, and re-parse for nothing.
-      if (next === file) return;
-      file = next;
-      clearError(ID);
-      // Reset before the parse, not after it. A failed load that only shows an
-      // error would otherwise leave the previous document's thumbnails and page
-      // count on screen, and the early return above means nothing corrects it.
-      grid.innerHTML = '';
-      order = [];
-      status.textContent = file ? `Reading ${file.name}…` : 'No PDF loaded.';
-      if (!file) return;
-      try {
-        const { count, stale } = await busy(panel, renderGrid(grid, file, { onThumb: decorate }));
-        if (stale) return; // a newer render owns the grid — show nothing, this is not an error
+    onFiles: loadInto(ID, {
+      status,
+      reset() {
+        grid.innerHTML = '';
+        order = [];
+      },
+      load: f => renderGrid(grid, f, { onThumb: decorate }),
+      apply(count) {
         order = Array.from({ length: count }, (_, i) => i);
         paint();
-        status.textContent = `Loaded: ${file.name} · ${count} pages`;
-      } catch (err) {
-        if (file !== next) return; // a newer file took over while this one parsed
-        // The status says which file, the error below says why.
-        status.textContent = `Could not read ${file.name}.`;
-        showError(ID, err.message);
-      }
-    },
+      },
+    }),
   });
 }

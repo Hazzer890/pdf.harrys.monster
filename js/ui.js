@@ -97,6 +97,52 @@ export function clearError(panelId) {
   el.textContent = '';
 }
 
+/**
+ * The shared `onFiles` body for a panel that works on one PDF. Returns a
+ * function to hand straight to `registerTool`.
+ *
+ * It owns the unchanged-file early return, the reset-before-parse, the two
+ * freshness checks after the await and the four status strings, so every panel
+ * words them identically and a fix here is a fix everywhere.
+ *
+ * `load(file)` resolves `{ count, stale }` — usually straight from `renderGrid`.
+ * `reset()` clears the panel's widgets; `apply(count)` fills them back in once
+ * the load has been proven to be for the file still selected.
+ */
+export function loadInto(id, { status, reset, load, apply }) {
+  const panel = document.getElementById(`panel-${id}`);
+  let current = null;
+  return async function onFiles() {
+    const next = state.pdfs()[0] || null;
+    // onFiles fires on every panel switch, not only on a file change; rebuilding
+    // here would throw away whatever the user has set up in this panel.
+    if (next === current) return;
+    current = next;
+    clearError(id);
+    // Reset before the parse, not after it. A failed load that only showed an
+    // error would leave the previous document's widgets on screen, and the
+    // early return above means no later tool switch corrects it.
+    reset();
+    status.textContent = current ? `Reading ${current.name}…` : 'No PDF loaded.';
+    if (!current) return;
+    try {
+      const { count, stale } = await busy(panel, load(current));
+      if (stale) return; // a newer render owns the container — show nothing, this is not an error
+      // Distinct from `stale`: removing the file returns above without ever
+      // starting a newer render, so the generation is never bumped and nothing
+      // else would clear this finished load away.
+      if (current !== next) { reset(); return; }
+      apply(count);
+      status.textContent = `Loaded: ${next.name} · ${count} pages`;
+    } catch (err) {
+      if (current !== next) return; // a newer file, or none, took over while this one parsed
+      // The status says which file, the error line says why.
+      status.textContent = `Could not read ${next.name}.`;
+      showError(id, err.message);
+    }
+  };
+}
+
 export async function busy(panelEl, promise) {
   // depth counter: overlapping calls must not re-enable the panel early
   panelEl.dataset.busy = String(Number(panelEl.dataset.busy || 0) + 1);
