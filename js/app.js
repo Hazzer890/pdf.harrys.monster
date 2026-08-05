@@ -13,9 +13,15 @@ function select(id) {
   document.querySelectorAll('.panel').forEach(p => {
     p.hidden = p.id !== `panel-${id}`;
   });
-  location.hash = id;
+  // Only assign when it actually differs, so hashchange never re-enters.
+  if (location.hash.slice(1) !== id) location.hash = id;
   const t = tools.get(id);
   if (t && t.onFiles) t.onFiles(state.files);
+}
+
+function selectFromHash() {
+  const id = location.hash.slice(1);
+  select(tools.has(id) || document.getElementById(`panel-${id}`) ? id : 'merge');
 }
 
 function init() {
@@ -33,8 +39,8 @@ function init() {
     if (t && t.onFiles) t.onFiles(files);
   });
 
-  const initial = location.hash.slice(1);
-  select(tools.has(initial) || document.getElementById(`panel-${initial}`) ? initial : 'merge');
+  addEventListener('hashchange', selectFromHash);
+  selectFromHash();
 }
 
 document.addEventListener('DOMContentLoaded', init);
