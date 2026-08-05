@@ -1,6 +1,8 @@
 import { initDropzone, state } from './ui.js';
 import { init as initMerge } from './tools/merge.js';
 import { init as initRotate } from './tools/rotate.js';
+import { init as initReorder } from './tools/reorder.js';
+import { init as initSplit } from './tools/split.js';
 
 const tools = new Map();
 
@@ -40,6 +42,8 @@ function init() {
 
   initMerge();
   initRotate();
+  initReorder();
+  initSplit();
 
   document.querySelectorAll('.tool-btn').forEach(btn => {
     btn.addEventListener('click', () => select(btn.dataset.tool));
