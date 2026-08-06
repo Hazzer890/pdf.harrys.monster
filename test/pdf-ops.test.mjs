@@ -208,3 +208,20 @@ test('signaturePlacement normalises negative and oversized rotations', () => {
 test('loadPdf reports unreadable input in plain language', async () => {
   await assert.rejects(() => loadPdf(new Uint8Array([1, 2, 3])), /corrupt|read/i);
 });
+
+test('loadPdf reports a file that parses but has no page tree', async () => {
+  // A distinct branch from the test above: PDFDocument.load ACCEPTS this file
+  // and the failure only surfaces when the page tree is touched. Without the
+  // getPageCount() check in loadPdf this rejects with a raw
+  // "this.catalog.Pages is not a function" instead of the friendly message.
+  const body = [
+    '%PDF-1.4',
+    '1 0 obj<</Type/NotACatalog>>endobj',
+    'trailer<</Root 1 0 R/Size 2>>',
+    '%%EOF',
+  ].join('\n');
+  await assert.rejects(
+    () => loadPdf(new TextEncoder().encode(body)),
+    /corrupt|read/i,
+  );
+});

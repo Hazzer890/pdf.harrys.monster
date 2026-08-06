@@ -14,7 +14,7 @@ async function decode(file) {
   } catch {
     // TIFF lands here — Chromium and Firefox both refuse it and the dropzone
     // accepts .tif — and so does anything corrupt.
-    throw new Error('this image could not be read. It may be damaged, or in a format your browser does not support.');
+    throw new Error('Could not be read. It may be damaged, or in a format your browser does not support.');
   }
 }
 
@@ -49,7 +49,7 @@ async function flatten(file) {
   const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.95));
   // toBlob hands back null on failure; without this the next line throws a
   // TypeError that names nothing.
-  if (!blob) throw new Error('this image could not be encoded.');
+  if (!blob) throw new Error('Could not be encoded.');
   return { bytes: new Uint8Array(await blob.arrayBuffer()), type: 'jpg' };
 }
 
