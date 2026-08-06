@@ -214,6 +214,11 @@ export function init() {
       [ox, oy, ow, oh] = cur();
       overlay.setPointerCapture(e.pointerId);
       e.preventDefault(); e.stopPropagation();
+      // preventDefault above suppresses the focus a click would normally give a
+      // tabindex="0" element, so without this the arrow keys scroll the page
+      // instead of nudging a signature the user has just clicked on — while the
+      // panel copy tells them focusing it is what makes the arrows work.
+      overlay.focus();
     };
     overlay.addEventListener('pointerdown', e => start(e, 'move'));
     handle.addEventListener('pointerdown', e => start(e, 'resize'));
@@ -232,8 +237,11 @@ export function init() {
       const [l, t, w, h] = cur();
       const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
       if (d) place(l + d[0], t + d[1], w, h);
-      else if (e.key === '+' || e.key === '=' || e.key === '-') {
-        const next = Math.max(24, w + (e.key === '-' ? -4 * step : 4 * step));
+      // '_' is what Shift+minus reports on a US layout, so without it the
+      // documented "Shift for bigger steps" grows but cannot shrink.
+      else if (e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_') {
+        const shrink = e.key === '-' || e.key === '_';
+        const next = Math.max(24, w + (shrink ? -4 * step : 4 * step));
         place(l, t, next, next / ratio());
       } else return;
       e.preventDefault();
@@ -340,6 +348,7 @@ export function init() {
     // file change — but the new page may be smaller, so it goes back through the
     // clamp. This is also where a signature drawn before any PDF was loaded
     // first appears.
+    if (overlay) overlay.hidden = false;   // a page is mounted again; see reset()
     paint();
   }
 
@@ -421,6 +430,10 @@ export function init() {
         if (old) old.remove();
         // The signature and its overlay are user state, not a description of
         // the document, so they survive a file change as well as a tool switch.
+        // They are hidden while no page is mounted, though: an overlay floating
+        // in an empty stage after a failed load reads as broken, and Apply
+        // refuses in that state anyway.
+        if (overlay) overlay.hidden = true;
       },
       async load(f) {
         const r = await renderPage(f, 1);
