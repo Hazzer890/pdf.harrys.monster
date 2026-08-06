@@ -1,5 +1,5 @@
 import { registerTool } from '../app.js';
-import { state, renderGrid, loadInto, downloadBlob, showError, clearError, busy, baseName } from '../ui.js';
+import { state, renderGrid, releaseGrid, loadInto, downloadBlob, showError, clearError, busy, baseName } from '../ui.js';
 
 const ID = 'reorder';
 
@@ -112,6 +112,9 @@ export function init() {
     onFiles: loadInto(ID, {
       status,
       reset() {
+        // Emptying the DOM is not enough: on removal no new render follows, so
+        // without this the parsed document stays in memory after Remove.
+        releaseGrid(grid);
         grid.innerHTML = '';
         order = [];
       },

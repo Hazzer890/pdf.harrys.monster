@@ -70,8 +70,12 @@ export function init() {
       // onFiles also fires on every panel switch, so rebuilding the list from
       // scratch would throw away the order the user just set. Keep the files
       // still loaded in their chosen order and append whatever is new.
+      // By name, not identity: re-picking a file replaces the File object in
+      // place, and an identity match would treat the replacement as new and
+      // send it to the end — in the one panel where position is the product.
       const pdfs = state.pdfs();
-      order = order.filter(f => pdfs.includes(f)).concat(pdfs.filter(f => !order.includes(f)));
+      const kept = order.map(f => pdfs.find(p => p.name === f.name)).filter(Boolean);
+      order = kept.concat(pdfs.filter(p => !kept.includes(p)));
       render();
     },
   });

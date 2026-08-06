@@ -49,7 +49,9 @@ export function initDropzone() {
     // Replace by name rather than append. Two entries with the same name are
     // indistinguishable in the list, and every single-document panel reads
     // `pdfs()[0]` — so the stale entry won, and editing a file and re-picking
-    // it appeared to do nothing at all. In place, so a merge order survives.
+    // it appeared to do nothing at all. In place, so the list position holds —
+    // but the replacement is a new File object, so anything reconciling by
+    // identity must match on name instead (see merge.js).
     // The cost: merging one file with itself is no longer expressible, and two
     // different files that share a name keep only the newer one.
     const next = [...state.files];
@@ -269,6 +271,21 @@ const grids = new WeakMap();
 /** Call counter per container: parsing is async, so calls can finish out of order. */
 const gens = new WeakMap();
 
+/**
+ * Drop a grid's observer and its pdf.js document. `renderGrid` calls this
+ * before it builds a new grid, but a panel whose file was *removed* never
+ * renders again — so without an explicit call the parsed document, and the
+ * file's bytes with it, stay in memory after the user pressed Remove.
+ */
+export function releaseGrid(container) {
+  const prev = grids.get(container);
+  if (!prev) return;
+  prev.observer.disconnect();
+  // this pdf.js build has no PDFDocumentProxy.destroy(); teardown is on the loading task.
+  prev.pdf.loadingTask.destroy().catch(() => {});
+  grids.delete(container);
+}
+
 export async function renderGrid(container, file, { onThumb } = {}) {
   const gen = (gens.get(container) || 0) + 1;
   gens.set(container, gen);
@@ -281,13 +298,7 @@ export async function renderGrid(container, file, { onThumb } = {}) {
     return { pdf: null, count: 0, stale: true };
   }
 
-  const prev = grids.get(container);
-  if (prev) {
-    prev.observer.disconnect();
-    // this pdf.js build has no PDFDocumentProxy.destroy(); teardown is on the loading task.
-    prev.pdf.loadingTask.destroy().catch(() => {});
-    grids.delete(container);
-  }
+  releaseGrid(container);
 
   container.innerHTML = '';
   // add, not assign: the container is usually .panel-body and tools re-query it.
