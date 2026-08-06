@@ -77,12 +77,15 @@ export function downloadBlob(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export async function downloadZip(entries, zipName) {
+/** `entries[].bytes` may be a Uint8Array or a Blob; JSZip takes either. */
+export async function downloadZip(entries, zipName, options) {
   // UMD bundle: no ES export, so import for side effects and read the global.
   await import('../vendor/jszip.min.js');
   const zip = new window.JSZip();
   entries.forEach(e => zip.file(e.name, e.bytes));
-  downloadBlob(await zip.generateAsync({ type: 'blob' }), zipName);
+  // `options` reaches generateAsync, so a caller zipping already-compressed data
+  // can ask for STORE instead of paying for a deflate that gains nothing.
+  downloadBlob(await zip.generateAsync({ type: 'blob', ...options }), zipName);
 }
 
 export function showError(panelId, message) {
@@ -172,9 +175,14 @@ export function getPdfjs() {
 export async function loadPdfjsDoc(file) {
   const lib = await getPdfjs();
   const data = new Uint8Array(await file.arrayBuffer());
+  const task = lib.getDocument({ data });
   try {
-    return await lib.getDocument({ data }).promise;
+    return await task.promise;
   } catch (err) {
+    // A rejected load has already spun up a worker and nothing else holds the
+    // task, so every unreadable or password-protected file leaked one. Measured:
+    // a failed load left `new Worker` at 1 and `terminate()` at 0.
+    task.destroy().catch(() => {});
     if (err && err.name === 'PasswordException') {
       throw new Error('This PDF is password-protected. Remove the password and try again.');
     }

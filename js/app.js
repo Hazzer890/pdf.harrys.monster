@@ -5,6 +5,7 @@ import { init as initReorder } from './tools/reorder.js';
 import { init as initSplit } from './tools/split.js';
 import { init as initA4 } from './tools/a4.js';
 import { init as initImages } from './tools/images.js';
+import { init as initConvert } from './tools/convert.js';
 
 const tools = new Map();
 
@@ -48,6 +49,7 @@ function init() {
   initSplit();
   initA4();
   initImages();
+  initConvert();
 
   document.querySelectorAll('.tool-btn').forEach(btn => {
     btn.addEventListener('click', () => select(btn.dataset.tool));
