@@ -3,6 +3,8 @@ import { init as initMerge } from './tools/merge.js';
 import { init as initRotate } from './tools/rotate.js';
 import { init as initReorder } from './tools/reorder.js';
 import { init as initSplit } from './tools/split.js';
+import { init as initA4 } from './tools/a4.js';
+import { init as initImages } from './tools/images.js';
 
 const tools = new Map();
 
@@ -44,6 +46,8 @@ function init() {
   initRotate();
   initReorder();
   initSplit();
+  initA4();
+  initImages();
 
   document.querySelectorAll('.tool-btn').forEach(btn => {
     btn.addEventListener('click', () => select(btn.dataset.tool));

@@ -4,7 +4,13 @@ export const A4 = [595.276, 841.890];
 
 export async function loadPdf(bytes) {
   try {
-    return await PDFDocument.load(bytes);
+    const doc = await PDFDocument.load(bytes);
+    // A file with a %PDF header but no catalog loads without complaint and only
+    // fails later, deep in an op, with a raw "reading 'Pages'" TypeError. Touch
+    // the page tree here so that lands in the catch below like any other
+    // unreadable file. Every op goes through loadPdf, so one check covers all.
+    doc.getPageCount();
+    return doc;
   } catch (err) {
     const msg = String(err && err.message);
     if (msg.includes('is encrypted')) {

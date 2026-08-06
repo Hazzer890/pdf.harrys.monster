@@ -34,7 +34,8 @@
 
 .panel { padding: clamp(18px, 3vw, 28px); }
 .panel-sub { color: var(--ink-mute); margin-bottom: 1.2rem; }
-.panel-error { color: var(--danger); margin-top: 1rem; font-size: .9rem; }
+/* pre-line: the batch panels report one failure per line. */
+.panel-error { color: var(--danger); margin-top: 1rem; font-size: .9rem; white-space: pre-line; }
 .panel-toolbar { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-bottom: 1rem; }
 
 .thumb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem; }
