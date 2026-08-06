@@ -7,6 +7,7 @@ import { init as initA4 } from './tools/a4.js';
 import { init as initImages } from './tools/images.js';
 import { init as initConvert } from './tools/convert.js';
 import { init as initCompress } from './tools/compress.js';
+import { init as initSign } from './tools/sign.js';
 
 const tools = new Map();
 
@@ -52,6 +53,7 @@ function init() {
   initImages();
   initConvert();
   initCompress();
+  initSign();
 
   document.querySelectorAll('.tool-btn').forEach(btn => {
     btn.addEventListener('click', () => select(btn.dataset.tool));

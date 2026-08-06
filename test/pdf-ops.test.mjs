@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { PDFDocument, degrees } from '../vendor/pdf-lib.esm.min.js';
 import {
   loadPdf, splitRanges, mergePdfs, splitPdf, rotatePdf, reorderPdf,
-  resizeToA4, signaturePlacement, A4,
+  resizeToA4, signaturePlacement, stampSignature, A4,
 } from '../js/pdf-ops.js';
 
 async function makePdf(pageCount, size = [400, 600]) {
@@ -203,6 +203,18 @@ test('signaturePlacement normalises negative and oversized rotations', () => {
   const rect = { x: 0, y: 0, w: 10, h: 10 };
   assert.equal(signaturePlacement({ rect, pageRotation: -90 }).rotate, 270);
   assert.equal(signaturePlacement({ rect, pageRotation: 450 }).rotate, 90);
+});
+
+test('stampSignature rejects an out-of-range page in plain language', async () => {
+  // Unguarded, getPage() throws a raw pdf-lib message naming an internal type.
+  // The guard runs before embedPng, so the PNG bytes are never reached.
+  const buf = await makePdf(2);
+  await assert.rejects(() => stampSignature(buf, { pageIndex: 2, pngBytes: new Uint8Array(), rect: {} }),
+    /Page must be between 1 and 2\./);
+  await assert.rejects(() => stampSignature(buf, { pageIndex: -1, pngBytes: new Uint8Array(), rect: {} }),
+    /Page must be between 1 and 2\./);
+  await assert.rejects(() => stampSignature(buf, { pageIndex: 0.5, pngBytes: new Uint8Array(), rect: {} }),
+    /Page must be between 1 and 2\./);
 });
 
 test('loadPdf reports unreadable input in plain language', async () => {

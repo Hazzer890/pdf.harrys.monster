@@ -165,6 +165,12 @@ export function signaturePlacement({ rect, pageRotation }) {
 
 export async function stampSignature(buf, { pageIndex, pngBytes, rect }) {
   const doc = await loadPdf(buf);
+  const count = doc.getPageCount();
+  // getPage() out of range throws a raw pdf-lib message naming an internal
+  // type. Every caller reaches the page tree through here, so guard once.
+  if (!Number.isInteger(pageIndex) || pageIndex < 0 || pageIndex >= count) {
+    throw new Error(`Page must be between 1 and ${count}.`);
+  }
   const page = doc.getPage(pageIndex);
   const img = await doc.embedPng(pngBytes);
   const p = signaturePlacement({ rect, pageRotation: page.getRotation().angle });

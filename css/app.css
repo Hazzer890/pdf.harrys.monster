@@ -19,6 +19,14 @@
 .file-list button { margin-left: auto; }
 
 .app-body { display: grid; grid-template-columns: 240px 1fr; gap: 1.5rem; margin-top: 1.5rem; }
+/*
+ * A grid item defaults to min-width: auto, which lets it grow past the grid to
+ * fit its widest content — so the sign panel's page preview widened the whole
+ * column and made the document scroll sideways, and every `max-width: 100%`
+ * inside it resolved against the grown width and never bound. Measured at
+ * 390 px: 386 px of horizontal overflow before this line.
+ */
+.app-body > * { min-width: 0; }
 
 .tool-nav { display: flex; flex-direction: column; gap: .35rem; }
 .tool-btn {
@@ -52,7 +60,18 @@
 .thumb.is-dragging { opacity: .4; }
 .thumb.cut-after { box-shadow: 4px 0 0 var(--accent); }
 
-.sign-stage { position: relative; display: inline-block; touch-action: none; }
+/*
+ * Signature placement depends on this block. The stage is the overlay's
+ * offsetParent, and the canvas sits at its origin, so `display: block` on the
+ * canvas (no inline baseline gap) is what makes overlay.offsetLeft/Top mean
+ * "pixels from the top-left of the page". `max-width` stops a 700 px preview
+ * overflowing a phone; sign.js converts the resulting CSS pixels back to canvas
+ * pixels via getBoundingClientRect, so scaling here is safe — but only because
+ * it does. `height: auto` must stay, or the canvas keeps its attribute height
+ * and the page is squashed.
+ */
+.sign-stage { position: relative; display: block; width: max-content; max-width: 100%; touch-action: none; }
+.sign-stage canvas { display: block; max-width: 100%; height: auto; }
 .sign-overlay {
   position: absolute; cursor: move; outline: 2px solid var(--accent);
   background: rgba(59, 91, 219, .06);
@@ -61,7 +80,18 @@
   position: absolute; right: -7px; bottom: -7px; width: 14px; height: 14px;
   background: var(--accent); border-radius: 50%; cursor: nwse-resize;
 }
-.sign-pad { border: 1px solid var(--glass-brd); border-radius: 12px; background: #fff; touch-action: none; }
+/*
+ * `body` has `overflow-x: hidden`, so anything wider than the column is clipped
+ * rather than scrollable: at 390 px the 480 px pad lost its right-hand 135 px
+ * with no way to reach it. `height: auto` is not optional — without it the
+ * bitmap is squashed horizontally on display while makePad's pos() keeps
+ * mapping y at full scale, so the exported signature would not match the
+ * shape that was drawn.
+ */
+.sign-pad {
+  border: 1px solid var(--glass-brd); border-radius: 12px; background: #fff;
+  touch-action: none; max-width: 100%; height: auto;
+}
 
 .busy { opacity: .6; pointer-events: none; }
 
