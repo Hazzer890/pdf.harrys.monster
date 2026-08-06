@@ -25,6 +25,7 @@
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
+  <a href="#panels" class="skip-link">Skip to tools</a>
 
   <!-- SVG filter defs (shared background mount) -->
   <svg class="glass-defs" aria-hidden="true" focusable="false" width="0" height="0">
@@ -83,73 +84,75 @@
     </div>
 
     <div class="app-body">
-      <nav class="tool-nav" aria-label="Tools">
-        <button class="tool-btn" data-tool="merge">Merge PDFs</button>
-        <button class="tool-btn" data-tool="images">Photo to PDF</button>
-        <button class="tool-btn" data-tool="split">Split PDF</button>
-        <button class="tool-btn" data-tool="compress">Compress PDF</button>
-        <button class="tool-btn" data-tool="convert">PDF to PNG/JPG</button>
-        <button class="tool-btn" data-tool="sign">Sign PDF</button>
-        <button class="tool-btn" data-tool="rotate">Rotate PDF</button>
-        <button class="tool-btn" data-tool="reorder">Change page order</button>
-        <button class="tool-btn" data-tool="a4">Resize to A4</button>
+      <!-- Roving tabindex: app.js keeps exactly one button at tabindex 0 and
+           moves it with the arrow keys. The markup below is the pre-JS state. -->
+      <nav class="tool-nav" role="tablist" aria-label="Tools">
+        <button class="tool-btn" role="tab" id="tab-merge" aria-controls="panel-merge" data-tool="merge">Merge PDFs</button>
+        <button class="tool-btn" role="tab" id="tab-images" aria-controls="panel-images" data-tool="images" tabindex="-1">Photo to PDF</button>
+        <button class="tool-btn" role="tab" id="tab-split" aria-controls="panel-split" data-tool="split" tabindex="-1">Split PDF</button>
+        <button class="tool-btn" role="tab" id="tab-compress" aria-controls="panel-compress" data-tool="compress" tabindex="-1">Compress PDF</button>
+        <button class="tool-btn" role="tab" id="tab-convert" aria-controls="panel-convert" data-tool="convert" tabindex="-1">PDF to PNG/JPG</button>
+        <button class="tool-btn" role="tab" id="tab-sign" aria-controls="panel-sign" data-tool="sign" tabindex="-1">Sign PDF</button>
+        <button class="tool-btn" role="tab" id="tab-rotate" aria-controls="panel-rotate" data-tool="rotate" tabindex="-1">Rotate PDF</button>
+        <button class="tool-btn" role="tab" id="tab-reorder" aria-controls="panel-reorder" data-tool="reorder" tabindex="-1">Change page order</button>
+        <button class="tool-btn" role="tab" id="tab-a4" aria-controls="panel-a4" data-tool="a4" tabindex="-1">Resize to A4</button>
       </nav>
 
-      <div class="tool-panels" id="panels">
+      <div class="tool-panels" id="panels" tabindex="-1">
         <!-- One per tool, filled by later tasks -->
-        <section class="panel glass" id="panel-merge" hidden>
+        <section class="panel glass" id="panel-merge" role="tabpanel" aria-labelledby="tab-merge" hidden>
           <h2>Merge PDFs</h2>
           <p class="panel-sub">Add multiple PDFs, reorder them, and export a single combined file.</p>
           <div class="panel-body"></div>
-          <p class="panel-error" role="alert" hidden></p>
+          <p class="panel-error" role="alert"></p>
         </section>
-        <section class="panel glass" id="panel-images" hidden>
+        <section class="panel glass" id="panel-images" role="tabpanel" aria-labelledby="tab-images" hidden>
           <h2>Photo to PDF</h2>
           <p class="panel-sub">Convert one or more images into a PDF document.</p>
           <div class="panel-body"></div>
-          <p class="panel-error" role="alert" hidden></p>
+          <p class="panel-error" role="alert"></p>
         </section>
-        <section class="panel glass" id="panel-split" hidden>
+        <section class="panel glass" id="panel-split" role="tabpanel" aria-labelledby="tab-split" hidden>
           <h2>Split PDF</h2>
           <p class="panel-sub">Page thumbnails with cut points placed between pages.</p>
           <div class="panel-body"></div>
-          <p class="panel-error" role="alert" hidden></p>
+          <p class="panel-error" role="alert"></p>
         </section>
-        <section class="panel glass" id="panel-compress" hidden>
+        <section class="panel glass" id="panel-compress" role="tabpanel" aria-labelledby="tab-compress" hidden>
           <h2>Compress PDF</h2>
           <p class="panel-sub">Rebuild the PDF at a lower image quality to reduce file size.</p>
           <div class="panel-body"></div>
-          <p class="panel-error" role="alert" hidden></p>
+          <p class="panel-error" role="alert"></p>
         </section>
-        <section class="panel glass" id="panel-convert" hidden>
+        <section class="panel glass" id="panel-convert" role="tabpanel" aria-labelledby="tab-convert" hidden>
           <h2>PDF to PNG/JPG</h2>
           <p class="panel-sub">Render each page and export to PNG or JPG images.</p>
           <div class="panel-body"></div>
-          <p class="panel-error" role="alert" hidden></p>
+          <p class="panel-error" role="alert"></p>
         </section>
-        <section class="panel glass" id="panel-sign" hidden>
+        <section class="panel glass" id="panel-sign" role="tabpanel" aria-labelledby="tab-sign" hidden>
           <h2>Sign PDF</h2>
           <p class="panel-sub">Draw or upload a signature, then place it on the page. This is a visual stamp, not a cryptographic signature.</p>
           <div class="panel-body"></div>
-          <p class="panel-error" role="alert" hidden></p>
+          <p class="panel-error" role="alert"></p>
         </section>
-        <section class="panel glass" id="panel-rotate" hidden>
+        <section class="panel glass" id="panel-rotate" role="tabpanel" aria-labelledby="tab-rotate" hidden>
           <h2>Rotate PDF</h2>
           <p class="panel-sub">Rotate all pages or a selected page range by 90, 180, or 270 degrees.</p>
           <div class="panel-body"></div>
-          <p class="panel-error" role="alert" hidden></p>
+          <p class="panel-error" role="alert"></p>
         </section>
-        <section class="panel glass" id="panel-reorder" hidden>
+        <section class="panel glass" id="panel-reorder" role="tabpanel" aria-labelledby="tab-reorder" hidden>
           <h2>Change page order</h2>
           <p class="panel-sub">Preview pages, move them, and save a reordered PDF.</p>
           <div class="panel-body"></div>
-          <p class="panel-error" role="alert" hidden></p>
+          <p class="panel-error" role="alert"></p>
         </section>
-        <section class="panel glass" id="panel-a4" hidden>
+        <section class="panel glass" id="panel-a4" role="tabpanel" aria-labelledby="tab-a4" hidden>
           <h2>Resize to A4</h2>
           <p class="panel-sub">Convert every page to A4 (595 × 842 pt), scaled to fit while keeping aspect ratio.</p>
           <div class="panel-body"></div>
-          <p class="panel-error" role="alert" hidden></p>
+          <p class="panel-error" role="alert"></p>
         </section>
       </div>
     </div>

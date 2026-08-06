@@ -132,9 +132,11 @@ export function init() {
     </p>
     <canvas class="sign-pad" id="sg-pad" width="480" height="150"></canvas>
     <div class="sign-stage" id="sg-stage"></div>
+    <p class="sr-only" id="sg-pos" aria-live="polite"></p>
     <p class="panel-sub" id="sg-status">No PDF loaded.</p>`;
 
   const stage = body.querySelector('#sg-stage');
+  const posSay = body.querySelector('#sg-pos');
   const pageInput = body.querySelector('#sg-page');
   const status = body.querySelector('#sg-status');
   const upload = body.querySelector('#sg-upload');
@@ -196,6 +198,10 @@ export function init() {
     overlay = document.createElement('div');
     overlay.className = 'sign-overlay';
     overlay.tabIndex = 0;
+    // Without a role the label is announced bare, and a screen reader in browse
+    // mode eats the arrow keys this widget is driven by. `application` is the
+    // one role that hands them through.
+    overlay.setAttribute('role', 'application');
     // Placement is pointer-driven, so the keyboard path needs both a way in
     // (tabIndex) and a way to know what to press. WCAG 2.1.1.
     overlay.setAttribute('aria-label', 'Signature placement. Arrow keys move it, Shift for bigger steps, plus and minus resize it.');
@@ -245,6 +251,14 @@ export function init() {
         place(l, t, next, next / ratio());
       } else return;
       e.preventDefault();
+      // Where it landed, in terms anyone can act on without seeing the page.
+      // Keyboard only: announcing every pointermove would be a stream of noise.
+      const canvas = stage.querySelector('canvas');
+      if (!canvas || !canvas.clientWidth || !canvas.clientHeight) return;
+      const [nl, nt, nw] = cur();
+      const pc = (a, b) => Math.round((a / b) * 100);
+      posSay.textContent = `Signature ${pc(nl, canvas.clientWidth)}% across, `
+        + `${pc(nt, canvas.clientHeight)}% down, ${pc(nw, canvas.clientWidth)}% wide.`;
     });
     return overlay;
   }

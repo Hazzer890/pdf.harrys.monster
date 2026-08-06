@@ -11,9 +11,11 @@ export function init() {
       <button type="button" class="btn btn-primary" id="reorder-go">Save reordered PDF</button>
     </div>
     <p class="panel-sub" id="reorder-status">No PDF loaded.</p>
+    <p class="sr-only" id="reorder-say" aria-live="polite"></p>
     <div id="reorder-grid"></div>`;
 
   const grid = body.querySelector('#reorder-grid');
+  const say = body.querySelector('#reorder-say');
   const status = body.querySelector('#reorder-status');
   const file = () => state.pdfs()[0] || null;
   let order = [];
@@ -23,6 +25,9 @@ export function init() {
     if (from < 0 || from >= order.length || to < 0 || to >= order.length) return;
     const [item] = order.splice(from, 1);
     order.splice(to, 0, item);
+    // The cards move visually but not in the DOM, so nothing about this is
+    // perceivable without sight of the grid unless it is said out loud.
+    say.textContent = `Page ${item + 1} moved to position ${to + 1} of ${order.length}.`;
     const pressed = document.activeElement;
     paint();
     // paint() may have just disabled the arrow that was pressed, and the browser

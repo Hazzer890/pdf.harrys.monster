@@ -14,7 +14,9 @@ export const state = {
 };
 
 export function baseName(file) {
-  return String(file.name).replace(/\.[^.]+$/, '');
+  // Strip separators too: this becomes a download filename, and a name carrying
+  // a path is the browser's problem to sanitise rather than ours.
+  return String(file.name).replace(/\.[^.]+$/, '').replace(/[/\\]/g, '_');
 }
 
 export function bytesToSize(n) {
@@ -44,7 +46,18 @@ export function initDropzone() {
   zone.addEventListener('drop', e => add([...e.dataTransfer.files]));
 
   function add(files) {
-    state.set([...state.files, ...files]);
+    // Replace by name rather than append. Two entries with the same name are
+    // indistinguishable in the list, and every single-document panel reads
+    // `pdfs()[0]` — so the stale entry won, and editing a file and re-picking
+    // it appeared to do nothing at all. In place, so a merge order survives.
+    // The cost: merging one file with itself is no longer expressible, and two
+    // different files that share a name keep only the newer one.
+    const next = [...state.files];
+    for (const f of files) {
+      const at = next.findIndex(x => x.name === f.name);
+      if (at === -1) next.push(f); else next[at] = f;
+    }
+    state.set(next);
   }
 
   state.onChange(files => {
@@ -89,16 +102,34 @@ export async function downloadZip(entries, zipName, options) {
   downloadBlob(await zip.generateAsync({ type: 'blob', ...options }), zipName);
 }
 
+// The error line is a permanent role="alert" region, empty when there is
+// nothing to say. It used to be `hidden` until it filled, which takes it out of
+// the accessibility tree — a live region that is not in the tree when its text
+// changes announces nothing, so no error in this app was ever spoken.
 export function showError(panelId, message) {
-  const el = document.querySelector(`#panel-${panelId} .panel-error`);
-  el.textContent = message;
-  el.hidden = false;
+  document.querySelector(`#panel-${panelId} .panel-error`).textContent = message;
 }
 
 export function clearError(panelId) {
-  const el = document.querySelector(`#panel-${panelId} .panel-error`);
-  el.hidden = true;
-  el.textContent = '';
+  document.querySelector(`#panel-${panelId} .panel-error`).textContent = '';
+}
+
+/**
+ * Last resort for a rejection nobody handled: without this the panel just sits
+ * there having done nothing, with the reason in the console the user will never
+ * open.
+ */
+export function initErrorTrap() {
+  addEventListener('unhandledrejection', e => {
+    const panel = document.querySelector('.panel:not([hidden])');
+    if (!panel) return;
+    const reason = e.reason;
+    // Deliberately vague about *which* tool: nothing links a stray rejection
+    // back to the panel that started it, and an operation carries on after the
+    // user switches tools, so the visible panel is a guess, not the cause.
+    showError(panel.id.replace('panel-', ''),
+      `Something went wrong: ${reason && reason.message ? reason.message : reason}`);
+  });
 }
 
 /**
@@ -195,6 +226,16 @@ export function getPdfjs() {
 export async function loadPdfjsDoc(file) {
   const lib = await getPdfjs();
   const data = new Uint8Array(await file.arrayBuffer());
+  // Twin of `looksTruncated` in pdf-ops.js — the reasoning and the measurements
+  // are there. Copied rather than imported because importing that module here
+  // would pull 674 KB of pdf-lib into the initial page load for four tools that
+  // never use it. A truncated file loads clean and silently short; the missing
+  // trailer is the only thing that gives it away. Change both.
+  const dec = new TextDecoder('latin1');
+  if (dec.decode(data.subarray(0, 5)).startsWith('%PDF')
+    && !dec.decode(data.subarray(Math.max(0, data.length - 1024))).includes('%%EOF')) {
+    throw new Error('This PDF is incomplete or damaged — the end of the file is missing, so pages would be lost. Download or copy it again.');
+  }
   const task = lib.getDocument({ data });
   try {
     return await task.promise;

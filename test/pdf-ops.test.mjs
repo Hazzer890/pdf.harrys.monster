@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PDFDocument, degrees } from '../vendor/pdf-lib.esm.min.js';
+import { PDFDocument, StandardFonts, degrees } from '../vendor/pdf-lib.esm.min.js';
 import {
   loadPdf, splitRanges, mergePdfs, splitPdf, rotatePdf, reorderPdf,
-  resizeToA4, signaturePlacement, stampSignature, A4,
+  resizeToA4, signaturePlacement, stampSignature, looksTruncated, A4,
 } from '../js/pdf-ops.js';
 
 async function makePdf(pageCount, size = [400, 600]) {
@@ -236,4 +236,32 @@ test('loadPdf reports a file that parses but has no page tree', async () => {
     () => loadPdf(new TextEncoder().encode(body)),
     /corrupt|read/i,
   );
+});
+
+test('loadPdf refuses a truncated file rather than silently losing its pages', async () => {
+  // pdf-lib's recovery parser is the whole point of this test: cut to 30% this
+  // fixture LOADS, with no error and 2 of its 5 pages. Measured before the
+  // guard existed. Drop the looksTruncated call in loadPdf and this test fails
+  // by resolving.
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  for (let i = 0; i < 5; i++) {
+    doc.addPage([300, 400]).drawText(`Page ${i + 1}`, { x: 20, y: 200, font, size: 24 });
+  }
+  const full = await doc.save();
+  const cut = full.subarray(0, Math.floor(full.length * 0.3));
+
+  // The premise: without the guard this file parses, short and silent.
+  assert.equal((await PDFDocument.load(cut)).getPageCount(), 2);
+  assert.equal((await PDFDocument.load(full)).getPageCount(), 5);
+
+  await assert.rejects(() => loadPdf(cut), /incomplete/i);
+  // The intact file is untouched by the check.
+  assert.equal((await loadPdf(full)).getPageCount(), 5);
+});
+
+test('looksTruncated leaves non-PDF bytes to the generic error path', () => {
+  assert.equal(looksTruncated(new Uint8Array([1, 2, 3, 4, 5, 6])), false);
+  assert.equal(looksTruncated(new TextEncoder().encode('%PDF-1.4\nnothing else')), true);
+  assert.equal(looksTruncated(new TextEncoder().encode('%PDF-1.4\nstuff\n%%EOF')), false);
 });

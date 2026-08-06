@@ -1,3 +1,22 @@
+/*
+ * First tab stop on the page, off-screen until focused. It does not navigate:
+ * the hash is the tool router, so a real jump to #panels would be rewritten to
+ * a tool id by selectFromHash. app.js moves focus instead.
+ */
+.skip-link {
+  position: fixed; top: 1rem; left: 1rem; z-index: 20;
+  padding: .6rem 1rem; border-radius: 10px;
+  background: var(--accent); color: #fff; text-decoration: none;
+  transform: translateY(-300%);
+}
+.skip-link:focus { transform: none; }
+
+/* Live regions that carry a message for a screen reader and nothing for the eye. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+
 .app { padding-block: clamp(24px, 5vw, 56px); }
 .nav-title { font-family: var(--font-mono); color: var(--ink-mute); font-size: .9rem; }
 
@@ -35,7 +54,7 @@
   color: var(--ink-soft); cursor: pointer; font: inherit;
 }
 .tool-btn:hover { background: var(--surface-2); }
-.tool-btn[aria-current="true"] {
+.tool-btn[aria-selected="true"] {
   background: var(--glass-fill-strong); border-color: var(--glass-brd);
   color: var(--ink); font-weight: 600;
 }
@@ -44,6 +63,13 @@
 .panel-sub { color: var(--ink-mute); margin-bottom: 1.2rem; }
 /* pre-line: the batch panels report one failure per line. */
 .panel-error { color: var(--danger); margin-top: 1rem; font-size: .9rem; white-space: pre-line; }
+/*
+ * `role="alert"` only announces when the region is already in the accessibility
+ * tree at the moment it fills, so this element is never `hidden`. An empty
+ * block generates no line box, so collapsing the margin is all it takes to make
+ * it invisible.
+ */
+.panel-error:empty { margin-top: 0; }
 .panel-toolbar { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-bottom: 1rem; }
 
 .thumb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem; }
@@ -58,6 +84,8 @@
 .thumb-label { font-family: var(--font-mono); font-size: .75rem; color: var(--ink-mute); margin-top: .4rem; }
 .thumb-actions { display: flex; justify-content: center; gap: .3rem; margin-top: .4rem; }
 .thumb.is-dragging { opacity: .4; }
+/* set by renderGrid when a page render fails; the label says why. */
+.thumb-failed { border-color: var(--danger); }
 .thumb.cut-after { box-shadow: 4px 0 0 var(--accent); }
 
 /*

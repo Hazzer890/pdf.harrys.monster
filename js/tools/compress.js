@@ -45,7 +45,10 @@ export function init() {
     <p class="panel-sub">
       <strong>This rebuilds each page as an image.</strong>
       Scanned documents shrink a lot. Text documents shrink too, but the text
-      stops being selectable or searchable.
+      stops being selectable or searchable, and everything that is not printed
+      ink is gone: <strong>a form becomes a picture of a form</strong> that
+      nobody can fill in or read the answers out of, and links, comments and
+      attachments are dropped. Keep your original.
     </p>
     <div class="panel-toolbar">
       <label>Quality <input type="range" id="cp-quality" min="30" max="95" value="70"></label>

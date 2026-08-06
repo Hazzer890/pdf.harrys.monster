@@ -39,6 +39,11 @@ export function init() {
   const panel = document.getElementById(`panel-${ID}`);
   const body = panel.querySelector('.panel-body');
   body.innerHTML = `
+    <p class="panel-sub">
+      Each page becomes a flat image. Whatever is on the page is in the picture,
+      but nothing else survives: text stops being selectable, form fields stop
+      being fields, and links, comments and attachments are dropped.
+    </p>
     <div class="panel-toolbar">
       <label>Format <select id="cv-format"><option value="png">PNG</option><option value="jpg">JPG</option></select></label>
       <label>Scale <input type="range" id="cv-scale" min="100" max="300" step="10" value="150"></label>
