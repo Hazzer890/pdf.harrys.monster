@@ -427,7 +427,10 @@ export function init() {
         pageInput.value = 1;
         pageInput.removeAttribute('max');
         const old = stage.querySelector('canvas');
-        if (old) old.remove();
+        if (old) { old.width = old.height = 0; old.remove(); }
+        // A load that never got mounted still parked its canvas here, so on
+        // removal the backing store outlived the document it came from.
+        if (pending) { pending.r.canvas.width = pending.r.canvas.height = 0; pending = null; }
         // The signature and its overlay are user state, not a description of
         // the document, so they survive a file change as well as a tool switch.
         // They are hidden while no page is mounted, though: an overlay floating
