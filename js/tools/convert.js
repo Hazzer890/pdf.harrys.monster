@@ -88,7 +88,7 @@ export function init() {
             // Blobs, not ArrayBuffers: the browser can back these with disk, and
             // JSZip reads them one at a time when it builds the archive.
             entries.push({ name: `${base}_page_${i}.${fmt}`, bytes: blob });
-            say(file, `Rendered ${i} of ${doc.numPages} pages…`);
+            say(file, `Rendered ${i} of ${doc.numPages} page${doc.numPages === 1 ? '' : 's'}…`);
           }
           // One page is one image, as in the A4 panel — a zip around a single
           // file is just an extra step for the user.

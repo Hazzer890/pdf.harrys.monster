@@ -20,7 +20,8 @@ export function baseName(file) {
 export function bytesToSize(n) {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
-  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
+  return `${(n / 1024 / 1024 / 1024).toFixed(1)} GB`;
 }
 
 export function initDropzone() {
@@ -152,11 +153,30 @@ export async function busy(panelEl, promise) {
   // depth counter: overlapping calls must not re-enable the panel early
   panelEl.dataset.busy = String(Number(panelEl.dataset.busy || 0) + 1);
   panelEl.classList.add('busy');
+  // `pointer-events: none` stops the mouse and nothing else. A button that still
+  // has focus from the click that started this run takes Enter and dispatches a
+  // fresh trusted click, which never hit-tests — so keyboard users could start a
+  // second and third concurrent run.
+  //
+  // `inert` alone does not close it: Chromium refuses *new* focus into an inert
+  // subtree but leaves an already-focused element focused, and Enter on it still
+  // activates. Measured — panel.inert true, document.activeElement still the
+  // button, one Enter still one click. So blur it explicitly. Focus lands on
+  // <body>, which is why we remember where the user was; only the outermost call
+  // restores, and by then any inner call has seen focus gone and captured null.
+  const refocus = panelEl.contains(document.activeElement) ? document.activeElement : null;
+  panelEl.inert = true;
+  if (refocus) refocus.blur();
   try { return await promise; }
   finally {
     const left = Number(panelEl.dataset.busy) - 1;
     if (left > 0) panelEl.dataset.busy = String(left);
-    else { delete panelEl.dataset.busy; panelEl.classList.remove('busy'); }
+    else {
+      delete panelEl.dataset.busy;
+      panelEl.classList.remove('busy');
+      panelEl.inert = false;
+      if (refocus) refocus.focus();
+    }
   }
 }
 
