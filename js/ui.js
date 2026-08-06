@@ -138,7 +138,7 @@ export function loadInto(id, { status, reset, load, apply }) {
       // own widgets, and clearing them here would wipe *its* state.
       if (current !== next) { if (!current) reset(); return; }
       apply(count);
-      status.textContent = `Loaded: ${next.name} · ${count} pages`;
+      status.textContent = `Loaded: ${next.name} · ${count} page${count === 1 ? '' : 's'}`;
     } catch (err) {
       if (current !== next) return; // a newer file, or none, took over while this one parsed
       // The status says which file, the error line says why.
