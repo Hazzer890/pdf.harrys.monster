@@ -46,7 +46,7 @@
 **Files:**
 - Create: `index.html`, `css/app.css`, `package.json`, `_headers`, `README.md`, `.gitignore`
 - Create: `vendor/pdf-lib.esm.min.js`, `vendor/pdf.min.mjs`, `vendor/pdf.worker.min.mjs`, `vendor/jszip.min.js`
-- Copy: `css/{reset,variables,layout,components,responsive}.css`, `js/background.js` from `/home/harry/Downloads/harrys.monster`
+- Copy: `css/{reset,variables,layout,components,responsive}.css`, `js/background.js` from `/home/harry/Documents/harrys.monster-sites/harrys.monster`
 
 **Interfaces:**
 - Consumes: nothing
@@ -71,7 +71,7 @@ Expected: four files, roughly 658K / 444K / 1232K / 95K.
 - [ ] **Step 2: Copy the design system unchanged**
 
 ```bash
-SITE=/home/harry/Downloads/harrys.monster
+SITE=/home/harry/Documents/harrys.monster-sites/harrys.monster
 cp $SITE/css/{reset,variables,layout,components,responsive}.css css/
 cp $SITE/js/background.js js/
 ```
